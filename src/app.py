@@ -1,20 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Provides endpoints for routing app."""
-
-from uuid import uuid4
+"""Provides main endpoint for blockchain frontend."""
 
 from flask import Flask, render_template
 
 app = Flask(__name__)
+app.config.from_pyfile('settings.cfg')
 
 
 @app.route('/', methods=['get'])
-def register():
+def index():
     return render_template(
-        template_name_or_list='index.html',
-        queue_router_ip=app.config.get('queue_router_ip'),
-        queue_router_port=app.config.get('queue_router_port'),
+        'index.html',
+        queue_router_ip=app.config.get('QUEUE_ROUTER_IP'),
+        queue_router_port=app.config.get('QUEUE_ROUTER_PORT'),
+        secs_factor= app.config.get('SECS_FACTOR'),
     )
 
 

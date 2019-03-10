@@ -2,9 +2,31 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Collaborative Blockchain Fiction</title>
+    <title>Collaborative Blockchain Ebook</title>
+    <link rel="stylesheet" href="/static/css/bookchain.css">
+    <script src="/static/js/bookchain.js" type="text/javascript"></script>
+    <script type="text/javascript">
+       document.addEventListener("DOMContentLoaded", function(event) {
+            initialiseBookchain(
+                queueRouterIp='{{ queue_router_ip }}',
+                queueRouterPort={{ queue_router_port }},
+                secsFactor={{ secs_factor }}
+            );
+       });
+    </script>
 </head>
 <body>
-    
+    <div id="top-nav">
+        <div class="nav-link">WRITE</div>
+        <div class="nav-link">READ</div>
+    </div>
+    <div id="write-container" class="clear-both">
+        <div id="message"></div>
+        <textarea id="textbox"></textarea>
+        <button id="submit"></button>
+    </div>
+
+    <div id="read-container" class="clear-both">
+    </div>
 </body>
 </html>
