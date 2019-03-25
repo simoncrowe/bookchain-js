@@ -153,7 +153,7 @@ function  consumeQueue(bookchain) {
                         partnerAddress=data['sender_address']
                     );
                 }
-                else if (data['type' === 'RESPOND_BLOCKS') {
+                else if (data['type'] === 'RESPOND_BLOCKS') {
                     setBlocks(bookchain, data['blocks'])
                 }
             }, function (error) {
