@@ -12,86 +12,209 @@
         var bookchain = null;
         var latestBlockText = null;
 
+        var writeButton = null;
+        var readButton = null;
+        var aboutButton = null;
+
+        var writeContainer = null;
+        var readContainer = null;
+        var aboutContainer = null;
+
+        var messageParagraph = null;
+
         document.addEventListener("DOMContentLoaded", function(event) {
             bookchain = initialiseBookchain(
                 queueRouterIp='{{ queue_router_host }}',
                 queueRouterPort={{ queue_router_port }},
                 newBlockCallback = updateLatestBlockText,
             );
+
+            writeButton = document.getElementById('write-button');
+            readButton = document.getElementById('read-button');
+            aboutButton = document.getElementById('about-button');
+
+            writeContainer = document.getElementById('write-container');
+            readContainer = document.getElementById('read-container');
+            aboutContainer = document.getElementById('about-container');
+
+            messageParagraph = document.getElementById('message');
+
+            updateGreeting();
+            showWriteContainer();
         });
 
         function updateLatestBlockText() {
+            let latestBlock = bookchain.peekMostRecentBlock();
+
             textBox = document.getElementById('textbox');
             if (document.activeElement !== textBox) {
-                latestBlockText = bookchain.peekMostRecentBlock()['text'];
+                latestBlockText = latestBlock.text;
+                updateGreeting();
             }
+
+            addBlockToDOM(latestBlock);
+
         }
 
         function submitBlock() {
             textBox = document.getElementById('textbox');
-            blockText = textBox.value;
-            data = {
-                'proposed_block_text': blockText,
-                'latest_block_text': latestBlockText
+            proposedBlockText = textBox.value;
+
+            if (proposedBlockText !== '') {
+                data = {
+                    'proposed_block_text': proposedBlockText,
+                    'latest_block_text': latestBlockText
+                };
+                makeRequest(
+                    'POST',
+                    'http://{{ validation_service_host }}:{{ validation_service_port }}/validate',
+                     data
+                ).then(
+                    function(response) {
+                        if (response['valid']) {
+                            sendNewBlock(bookchain, proposedBlockText);
+                            displayMessage(response['message'], 'success-message');
+                            textBox.value = '';
+                        }
+                        else {
+                            displayMessage(response['message'], 'error-message');
+                        }
+                    }
+                );
             }
+            else {
+                displayMessage('Please enter some text before submitting.', 'error-message');
+            }
+        }
+
+        function addBlockToDOM(block) {
+            let newBlockDiv = document.createElement('div');
+            newBlockDiv.className = 'read-block';
+
+            let textParagraph = document.createElement('p');
+            textParagraph.textContent = block['text'];
+            newBlockDiv.appendChild(textParagraph);
+
+            let hashParagraph = document.createElement('p');
+            hashParagraph.className = 'hash-paragraph';
+
+            let hashTitle = document.createElement('span');
+            hashTitle.className = 'block-info-heading';
+            hashTitle.textContent = 'Hash: ';
+            hashParagraph.appendChild(hashTitle);
+
+            let hashText = document.createElement('span');
+            if (block.hash === null) {
+                hashText.textContent = 'null (genesis block)';
+            }
+            else {
+                hashText.textContent = block.hash;
+            }
+            hashParagraph.appendChild(hashText);
+
+            newBlockDiv.appendChild(hashParagraph);
+
+
+            let timestampParagraph = document.createElement('p');
+            timestampParagraph.className = 'timestamp-paragraph';
+
+            let timestampTitle = document.createElement('span');
+            timestampTitle.textContent = 'timestamp: ';
+            timestampTitle.className = 'block-info-heading';
+            timestampParagraph.appendChild(timestampTitle);
+
+            let timestampText = document.createElement('span');
+            if (block.timestamp === null) {
+                timestampText.textContent = 'null (genesis block)';
+            }
+            else {
+                timestampText.textContent = block.timestamp;
+            }
+            timestampParagraph.appendChild(timestampText);
+
+            newBlockDiv.appendChild(timestampParagraph);
+
+
+            readContainer.appendChild(newBlockDiv);
+        }
+
+        function updateGreeting() {
             makeRequest(
                 'POST',
-                'http://{{ validation_service_host }}:{{ validation_service_port }}/validate',
-                data
-            ).next(
+                'http://{{ validation_service_host }}:{{ validation_service_port }}/greeting',
+                 {'latest_block_text': latestBlockText}
+            ).then(
                 function(response) {
-                    if (response['valid']) {
-                        sendNewBlock(bookchain, blockText);
-                        displayValidMessage(response['message']),
-                        textBox.value = '';
-                    }
-                    else {
-                        displayInvalidMessage(response['message']);
-                    }
+                    greetingDiv = document.getElementById('greeting');
+                    greetingDiv.innerHTML = response;
                 }
             );
         }
-        function displayValidMessage(message) {
+
+        function displayMessage(message, messageClass) {
+            messageParagraph.className = messageClass;
+            messageParagraph.style.display = 'block';
+            messageParagraph.textContent = message;
+
+            setTimeout(function() {
+                messageParagraph.style.display = 'none';
+            }, 5000);
 
         }
-        function displayInvalidMessage(message) {
-
-        }
-
         function showReadContainer() {
-             document.getElementById('write-container').style.display = 'none';
-             document.getElementById('read-container').style.display = 'block';
-
+             writeContainer.style.display = 'none';
+             writeButton.style.color = '#000832';
+             readContainer.style.display = 'block';
+             readButton.style.color = '#105070';
+             aboutContainer.style.display = 'none';
+             aboutButton.style.color = '#000832';
         }
 
         function showWriteContainer() {
-             document.getElementById('write-container').style.display = 'block';
-             document.getElementById('read-container').style.display = 'none';
+             writeContainer.style.display = 'block';
+             writeButton.style.color = '#105070';
+             readContainer.style.display = 'none';
+             readButton.style.color = '#000832';
+             aboutContainer.style.display = 'none';
+             aboutButton.style.color = '#000832';
+        }
+
+        function showAboutContainer() {
+             writeContainer.style.display = 'none';
+             writeButton.style.color = '#000832';
+             readContainer.style.display = 'none';
+             readButton.style.color = '#000832';
+             aboutContainer.style.display = 'block';
+             aboutButton.style.color = '#105070';
         }
 
     </script>
 </head>
 <body>
     <div id="top-nav">
-        <div id="write-button" class="nav-link">
-            <span class="nav-text" onclick="showWriteContainer();">WRITE</span>
+        <div id="write-button" class="nav-link" onclick="showWriteContainer();">
+            WRITE
         </div>
-        <div id="read-button" class="nav-link">
-            <span class="nav-text" onclick="showReadContainer();">READ</span>
+        <div id="read-button" class="nav-link" onclick="showReadContainer();">
+            READ
         </div>
-        <div id="about-button" class="nav-link">
-            <span class="nav-text" onclick="showReadContainer();">ABOUT</span>
+        <div id="about-button" class="nav-link" onclick="showAboutContainer();">
+            ABOUT
         </div>
         <div class="clear-both"></div>
     </div>
-    <div id="write-container"  style="display: block;">
+    <div id="write-container" style="display:none;">
         <div id="greeting"></div>
         <textarea id="textbox"></textarea>
         <div id="submit" onclick="submitBlock();">SUBMIT</div>
-        <div id="message"></div>
+        <div id="messages"><p id="message"></p></div>
     </div>
 
     <div id="read-container" class="clear-both" style="display:none;">
+    </div>
+
+    <div id="about-container" class="clear-both" style="display:none;">
+        {{ about_text| safe }}
     </div>
 </body>
 </html>

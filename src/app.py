@@ -14,8 +14,8 @@ def index():
         'index.html',
         queue_router_host=app.config.get('QUEUE_ROUTER_HOST'),
         queue_router_port=app.config.get('QUEUE_ROUTER_PORT'),
-        validate_service_host=app.config.get('VALIDATE_SERVICE_HOST'),
-        validate_service_port=app.config.get('VALIDATE_SERVICE_PORT'),
+        validation_service_host=app.config.get('VALIDATION_SERVICE_HOST'),
+        validation_service_port=app.config.get('VALIDATION_SERVICE_PORT'),
         secs_factor= app.config.get('SECS_FACTOR'),
     )
 

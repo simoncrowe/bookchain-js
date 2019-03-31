@@ -14,7 +14,12 @@ class Bookchain {
     }
 
     peekMostRecentBlock() {
-        return this.blocks[this.blocks.length - 1];
+        if (this.blocks.length > 0) {
+            return this.blocks[this.blocks.length - 1];
+        }
+        else {
+            return null;
+        }
     }
 
     routerGetRequest(path) {
@@ -175,94 +180,168 @@ function consumeQueue(bookchain) {
 
 function sendPartnerBlocks(bookchain, partnerAddress) {
     bookchain.busy = true;
-    bookchain.getAuthToken().then(digestValue => {
-        const hexDigest = hexString(digestValue);
 
-        data = {
-            'identity': bookchain.identity,
-            'token': hexDigest,
-            'address': partnerAddress,
-            'data':  JSON.stringify(
-                {
-                    'type': 'RESPOND_BLOCKS',
-                    'sender_address': bookchain.identity,
-                    'blocks': bookchain.blocks,
-                }
-            )
-        }
-        bookchain.routerPostRequest('/enqueue', data).then(
-            function(data) {
-                console.log('Successfully sent requested blocks.');
-                bookchain.busy = false;
-            }, function (error) {
-                console.log(
-                    '"/enqueue" request to send message for blocks failed.' +
-                    'Status: ' + error.status
-                );
-                setTimeout(function(){
-                    console.log('Retrying sending blocks...')
-                    sendPartnerBlocks(bookchain, partnerAddress);
-                }, 200);
+    data = {
+        'identity': bookchain.identity,
+        'token': bookchain.token,
+        'address': partnerAddress,
+        'data':  JSON.stringify(
+            {
+                'type': 'RESPOND_BLOCKS',
+                'sender_address': bookchain.identity,
+                'blocks': bookchain.blocks,
             }
         )
-    });
+    }
+    bookchain.routerPostRequest('/enqueue', data).then(
+        function(data) {
+            console.log('Successfully sent requested blocks.');
+            bookchain.busy = false;
+        }, function (error) {
+            console.log(
+                '"/enqueue" request to send message for blocks failed.' +
+                'Status: ' + error.status
+            );
+            setTimeout(function(){
+                console.log('Retrying sending blocks...')
+                sendPartnerBlocks(bookchain, partnerAddress);
+            }, 200);
+        }
+    )
 }
 
 
 function initialiseBlocks(bookchain, blocks) {
     bookchain.busy = true;
-    console.log('Checking integrity of blockchain...')
-    if (blocks.length > 0) {
-        // Add the "genesis block".
-        this.blocks.push(blocks.shift());
-        console.log('Added genesis block:' +  block)
-    }
-    setBlocks(bookchain, blocks);
+    console.log('Checking integrity of bookchain...')
+    addBlocks(bookchain, blocks);
 }
 
-function setBlocks(bookchain, blocks) {
+function addBlocks(bookchain, blocks) {
     if (blocks.length > 0) {
-        const nextBlock = blocks.shift()
-        getHash(nextBlock).then(digestValue => {
-            const hexDigest = hexString(digestValue);
-            if (blockchain.peekMostRecentBlock()['hash'] === hexDigest) {
-                blockchain.push(nextBlock);
-                setBlocks(blockchain, blocks);
-            } else {
-                console.log(
-                    'Block ' + blockchain.blocks.length() +
-                    ' has invalid hash. Ignoring this and subsequent blocks.'
-                );
-            }
-        });
+        const nextBlock = blocks.shift();
+        addBlock(bookchain, nextBlock);
+
     } else {
         bookchain.busy = false;
     }
 }
 
-function setBlock(block) {
+function addBlock(bookchain, block) {
     bookchain.busy = true;
     console.log('Validating new block...')
 
-    getHash(block).then(digestValue => {
-        const hexDigest = hexString(digestValue);
-        if (blockchain.peekMostRecentBlock()['hash'] === hexDigest) {
-            blockchain.push(block);
-            console.log(
-                'Validated and added block ' + this.blocks.length + ': ' + block
-            );
-            bookchain.newBlockCallback();
-            bookchain.busy = false;
-        } else {
-            console.log(
-                'Invalid block ignored: ' + block
-            );
-            bookchain.busy = false;
-        }
-    });
+    const mostRecentBlock = bookchain.peekMostRecentBlock();
+
+    if (mostRecentBlock === null) {
+        // No hash to check as this is the genesis block
+        bookchain.blocks.push(block);
+        console.log(
+            'Added genesis block ' + bookchain.blocks.length + ': ' +
+             JSON.stringify(block)
+        );
+        bookchain.newBlockCallback();
+        bookchain.busy = false;
+
+    }
+    else {
+        // This is a regular block
+        getHash(JSON.stringify(mostRecentBlock)).then(digestValue => {
+            const hexDigest = hexString(digestValue);
+
+            if (block['hash'] === hexDigest) {
+                bookchain.blocks.push(block);
+                console.log(
+                    'Validated and added block '
+                     + bookchain.blocks.length + ': ' + JSON.stringify(block)
+                );
+                bookchain.newBlockCallback();
+                bookchain.busy = false;
+            } else {
+                console.log(
+                    'Invalid block ignored: ' + JSON.stringify(block)
+                );
+                bookchain.busy = false;
+            }
+        });
+    }
 }
 
 function sendNewBlock(bookchain, blockContent) {
+    bookchain.busy = true;
     console.log('Submitting new block to network: ' + blockContent);
+
+    const mostRecentBlock = bookchain.peekMostRecentBlock();
+    postData = {
+        'identity': bookchain.identity,
+        'token': bookchain.token,
+    };
+
+    timestamp = new Date();
+
+    // Check if there is a previous block
+    if (mostRecentBlock === null) {
+        // Proceed without a hash for the genesis block
+        postData['data'] = JSON.stringify(
+            {
+                'type': 'ADD_BLOCK',
+                'type': 'ADD_BLOCK',
+                'block': {
+                    'text': blockContent,
+                    'hash': null,
+                    'timestamp': timestamp.toISOString(),
+                },
+            }
+        )
+        bookchain.routerPostRequest('/enqueue', postData).then(
+            function(data) {
+                console.log('Successfully sent new block.');
+                bookchain.busy = false;
+            },
+            function (error) {
+                console.log(
+                    '"/enqueue" request to add block failed.' +
+                    'Status: ' + error.status
+                );
+                console.log('Retrying in 200 milliseconds...')
+                setTimeout(function() {
+                    sendNewBlock(bookchain, blockContent);
+                }, 200);
+            }
+        );
+    }
+    else {
+        // Get the hash of the previous block
+        getHash(JSON.stringify(bookchain.peekMostRecentBlock())).then(digestValue => {
+            const hexDigest = hexString(digestValue);
+            postData['data'] = JSON.stringify(
+                {
+                    'type': 'ADD_BLOCK',
+                    'block': {
+                        'text': blockContent,
+                        'hash': hexDigest,
+                        'timestamp': timestamp.toISOString(),
+                    },
+                }
+            );
+            bookchain.routerPostRequest('/enqueue', postData).then(
+                function(data) {
+                    console.log('Successfully sent new block.');
+                    bookchain.busy = false;
+                },
+                function (error) {
+                    console.log(
+                        '"/enqueue" request to add block failed.' +
+                        'Status: ' + error.status
+                    );
+                    console.log('Retrying in 200 milliseconds...')
+                    setTimeout(function() {
+                        sendNewBlock(bookchain, blockContent);
+                    }, 200);
+                }
+            );
+        });
+    }
+
 }
 
