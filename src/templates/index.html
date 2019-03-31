@@ -2,31 +2,95 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Collaborative Blockchain Ebook</title>
+    <title>Bookchain: collaborative distributed text</title>
     <link rel="stylesheet" href="/static/css/bookchain.css">
+    <script src="/static/js/util.js" type="text/javascript"></script>
     <script src="/static/js/bookchain.js" type="text/javascript"></script>
     <script type="text/javascript">
-       document.addEventListener("DOMContentLoaded", function(event) {
-            initialiseBookchain(
-                queueRouterIp='{{ queue_router_ip }}',
+
+        var bookchain = null;
+        var latestBlockText = null;
+
+        document.addEventListener("DOMContentLoaded", function(event) {
+            bookchain = initialiseBookchain(
+                queueRouterIp='{{ queue_router_host }}',
                 queueRouterPort={{ queue_router_port }},
-                secsFactor={{ secs_factor }}
+                newBlockCallback = updateLatestBlockText,
             );
-       });
+        });
+
+        function updateLatestBlockText() {
+            textBox = document.getElementById('textbox');
+            if (document.activeElement !== textBox) {
+                latestBlockText = bookchain.peekMostRecentBlock()['text'];
+            }
+        }
+
+        function submitBlock() {
+            textBox = document.getElementById('textbox');
+            blockText = textBox.value;
+            data = {
+                'proposed_block_text': blockText,
+                'latest_block_text': latestBlockText
+            }
+            makeRequest(
+                'POST',
+                'http://{{ validation_service_host }}:{{ validation_service_port }}/validate',
+                data
+            ).next(
+                function(response) {
+                    if (response['valid']) {
+                        sendNewBlock(bookchain, blockText);
+                        displayValidMessage(response['message']),
+                        textBox.value = '';
+                    }
+                    else {
+                        displayInvalidMessage(response['message']);
+                    }
+                }
+            );
+        }
+        function displayValidMessage(message) {
+
+        }
+        function displayInvalidMessage(message) {
+
+        }
+
+        function showReadContainer() {
+             document.getElementById('write-container').style.display = 'none';
+             document.getElementById('read-container').style.display = 'block';
+
+        }
+
+        function showWriteContainer() {
+             document.getElementById('write-container').style.display = 'block';
+             document.getElementById('read-container').style.display = 'none';
+        }
+
     </script>
 </head>
 <body>
     <div id="top-nav">
-        <div class="nav-link">WRITE</div>
-        <div class="nav-link">READ</div>
+        <div id="write-button" class="nav-link">
+            <span class="nav-text" onclick="showWriteContainer();">WRITE</span>
+        </div>
+        <div id="read-button" class="nav-link">
+            <span class="nav-text" onclick="showReadContainer();">READ</span>
+        </div>
+        <div id="about-button" class="nav-link">
+            <span class="nav-text" onclick="showReadContainer();">ABOUT</span>
+        </div>
+        <div class="clear-both"></div>
     </div>
-    <div id="write-container" class="clear-both">
-        <div id="message"></div>
+    <div id="write-container"  style="display: block;">
+        <div id="greeting"></div>
         <textarea id="textbox"></textarea>
-        <button id="submit"></button>
+        <div id="submit" onclick="submitBlock();">SUBMIT</div>
+        <div id="message"></div>
     </div>
 
-    <div id="read-container" class="clear-both">
+    <div id="read-container" class="clear-both" style="display:none;">
     </div>
 </body>
 </html>

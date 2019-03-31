@@ -1,38 +1,40 @@
 
 class Bookchain {
-    constructor(routerIp, routerPort, secsFactor) {
+    constructor(routerIp, routerPort, newBlockCallback) {
 
         this.routerIp = routerIp;
         this.routerPort = routerPort;
         this.routerUrl = 'http://' + routerIp + ':' + routerPort;
         this.identity = null;
+        this.epoch = null;
+        this.token = null;
         this.blocks = [];
-        this.secsFactor = secsFactor;
-        this.secs = 0;
+        this.busy = false;
+        this.newBlockCallback = newBlockCallback;
+    }
 
-        this.textEncoder = new TextEncoder();
+    peekMostRecentBlock() {
+        return this.blocks[this.blocks.length - 1];
     }
 
     routerGetRequest(path) {
         const fullUrl = this.routerUrl + path;
-        return makeRequest('GET', fullUrl)
+        return makeRequest('GET', fullUrl);
     }
 
     routerPostRequest(path, data) {
         const fullUrl = this.routerUrl + path;
-        return makeRequest('POST', fullUrl, data)
-    }
-
-    getAuthQueryString(token) {
-        return '?identity=' + this.identity + '&token=' + token;
+        return makeRequest('POST', fullUrl, data);
     }
 
     getAuthToken() {
-        const tokenDataString = this.identity + '-' + this.secs;
-        // console.log('Generating token for ' + this.identity + ' at time: ' + this.secs)
-        const tokenData = this.textEncoder.encode(tokenDataString);
-        return window.crypto.subtle.digest('SHA-256', tokenData);
+        return getHash(this.identity + '-' + this.epoch);
     }
+
+    getAuthQueryString() {
+        return '?identity=' + this.identity + '&token=' + this.token;
+    }
+
 }
 
 
@@ -41,31 +43,9 @@ function initialiseBookchain(routerIp, routerPort, secsFactor) {
 
     // initialiseTime begins a chain of callbacks that initialise
     // this Bookchain instance with an identity and the latest blocks
-    initialiseTime(bookchain);
-
-}
-
-
-function initialiseTime(bookchain) {
-    bookchain.routerGetRequest('/secs').then(
-        function(data) {
-            console.log('Successfully got secs: ' + data);
-            initialiseSecsIncrement(bookchain, seconds=data);
-        }, function (error) {
-            console.log(
-                '"/secs" request failed.' +
-                'Could not get secs: ' + error.status
-            );
-        }
-    )
-}
-
-function initialiseSecsIncrement(bookchain, seconds) {
-    bookchain.secs = seconds;
-    setInterval(function() {
-        bookchain.secs += bookchain.secsFactor;
-    }, bookchain.secsFactor * 1000);
     requestIdentity(bookchain);
+    return bookchain;
+
 }
 
 
@@ -74,61 +54,78 @@ function requestIdentity(bookchain) {
         function(data) {
             console.log('Successfully got identity: ' + data.identity);
             bookchain.identity = data['identity'];
-            requestPartnerAddress(bookchain);
-        }, function (error) {
+            bookchain.epoch = data['epoch'];
+            generateAuthToken(bookchain);
+        },
+        function (error) {
             console.log(
                 '"/register" request failed. Code: ' + error.status
             );
+            console.log('Retrying in 200 milliseconds...')
+            setTimeout(function() {
+                requestIdentity(bookchain);
+            }, 200)
         }
     )
 }
 
-
-function requestPartnerAddress(bookchain) {
+function generateAuthToken(bookchain) {
+    console.log('Generating auth token...')
     bookchain.getAuthToken().then(digestValue => {
-        const hexDigest = hexString(digestValue);
-        const pairUrl = '/pair' + bookchain.getAuthQueryString(token=hexDigest);
-        bookchain.routerGetRequest(pairUrl).then(
-            function(data) {
-                console.log('Successfully got partner address! ' + data['address']);
-                sendBlocksRequest(bookchain, partnerAddress=data['address']);
-            }, function (error) {
-                console.log(
-                '"/pair" request failed.' +
-                'Could not get partner address. Status: ' + error.status
-                );
-            }
-        );
-
+        bookchain.token = hexString(digestValue);
+        requestPartnerAddress(bookchain)
     });
 }
 
-function sendBlocksRequest(bookchain, partnerAddress) {
-    bookchain.getAuthToken().then(digestValue => {
-        const hexDigest = hexString(digestValue);
-        data = {
-            'identity': bookchain.identity,
-            'token': hexDigest,
-            'address': partnerAddress,
-            'data': JSON.stringify(
-                {
-                    'type': 'REQUEST_BLOCKS',
-                    'sender_address': bookchain.identity,
-                }
-            )
+function requestPartnerAddress(bookchain) {
+    console.log('Attempting to pair...')
+    const pairUrl = '/pair' + bookchain.getAuthQueryString();
+    bookchain.routerGetRequest(pairUrl).then(
+        function(data) {
+            console.log('Successfully got partner address! ' + data['address']);
+            sendBlocksRequest(bookchain, partnerAddress=data['address']);
+        }, function (error) {
+            console.log(
+                '"/pair" request failed.' +
+                'Could not get partner address. Status: ' + error.status
+            );
+            console.log('Retrying in 200 milliseconds...')
+            setTimeout(function(){
+                requestPartnerAddress(bookchain);
+            }, 200);
         }
-        bookchain.routerPostRequest('/enqueue', data).then(
-            function(data) {
-                console.log('Successfully sent request for blocks.');
-                initialiseQueueConsumption(bookchain);
-            }, function (error) {
-                console.log(
-                    '"/enqueue" request to send message for blocks failed.' +
-                    'Status: ' + error.status
-                );
+    );
+}
+
+function sendBlocksRequest(bookchain, partnerAddress) {
+    data = {
+        'identity': bookchain.identity,
+        'token': bookchain.token,
+        'address': partnerAddress,
+        'data': JSON.stringify(
+            {
+                'type': 'REQUEST_BLOCKS',
+                'sender_address': bookchain.identity,
             }
         )
-    });
+    }
+    bookchain.routerPostRequest('/enqueue', data).then(
+        function(data) {
+            console.log('Successfully sent request for blocks.');
+            initialiseQueueConsumption(bookchain);
+        },
+        function (error) {
+            console.log(
+                '"/enqueue" request to send message for blocks failed.' +
+                'Status: ' + error.status
+            );
+            console.log('Retrying in 200 milliseconds...')
+            setTimeout(function() {
+                sendBlocksRequest(bookchain, partnerAddress);
+            }
+            , 200);
+        }
+    )
 }
 
 
@@ -140,38 +137,44 @@ function initialiseQueueConsumption(bookchain) {
 }
 
 
-function  consumeQueue(bookchain) {
-    bookchain.getAuthToken().then(digestValue => {
-        const hexDigest = hexString(digestValue);
-        const dequeueUrl = '/dequeue' + bookchain.getAuthQueryString(token=hexDigest);
+function consumeQueue(bookchain) {
+    if (!bookchain.busy) {
+        const dequeueUrl = '/dequeue' + bookchain.getAuthQueryString();
         bookchain.routerGetRequest(dequeueUrl).then(
-            function(data) {
-                console.log('Dequeued data: ' + JSON.stringify(data));
-                if (data['type'] === 'REQUEST_BLOCKS') {
+            function(message) {
+                console.log('Dequeued message: ' + JSON.stringify(message));
+                if (message['type'] === 'REQUEST_BLOCKS') {
                     sendPartnerBlocks(
                         bookchain,
-                        partnerAddress=data['sender_address']
+                        partnerAddress=message['sender_address']
                     );
                 }
-                else if (data['type'] === 'RESPOND_BLOCKS') {
-                    setBlocks(bookchain, data['blocks'])
+                else if (message['type'] === 'RESPOND_BLOCKS') {
+                    initialiseBlocks(bookchain, message['blocks']);
                 }
-            }, function (error) {
+                else if (message['type'] === 'ADD_BLOCK') {
+                    addBlock(bookchain, message['block']);
+                }
+            },
+            function (error) {
                 if (error.status === 404) {
                     console.log('No data to dequeue.')
+                    bookchain.busy = false;
                 }
                 else{
                     console.log(
                         '"/dequeue" request failed. Status: ' + error.status
                     );
+                    console.log('Retrying in 1 second...');
                 }
             }
         );
-    });
+    }
 }
 
 
 function sendPartnerBlocks(bookchain, partnerAddress) {
+    bookchain.busy = true;
     bookchain.getAuthToken().then(digestValue => {
         const hexDigest = hexString(digestValue);
 
@@ -190,7 +193,7 @@ function sendPartnerBlocks(bookchain, partnerAddress) {
         bookchain.routerPostRequest('/enqueue', data).then(
             function(data) {
                 console.log('Successfully sent requested blocks.');
-                bookchain.dequeueOut();
+                bookchain.busy = false;
             }, function (error) {
                 console.log(
                     '"/enqueue" request to send message for blocks failed.' +
@@ -205,61 +208,61 @@ function sendPartnerBlocks(bookchain, partnerAddress) {
     });
 }
 
-function setBlocks(bookchain, blocks) {
+
+function initialiseBlocks(bookchain, blocks) {
+    bookchain.busy = true;
     console.log('Checking integrity of blockchain...')
-    for (i=0; i > blocks.length; i++) {
-        // Evaluate each block before adding it.
-        // Ensure hashes are consistent.
-        bookchain.blocks.push(blocks[i]);
+    if (blocks.length > 0) {
+        // Add the "genesis block".
+        this.blocks.push(blocks.shift());
+        console.log('Added genesis block:' +  block)
+    }
+    setBlocks(bookchain, blocks);
+}
+
+function setBlocks(bookchain, blocks) {
+    if (blocks.length > 0) {
+        const nextBlock = blocks.shift()
+        getHash(nextBlock).then(digestValue => {
+            const hexDigest = hexString(digestValue);
+            if (blockchain.peekMostRecentBlock()['hash'] === hexDigest) {
+                blockchain.push(nextBlock);
+                setBlocks(blockchain, blocks);
+            } else {
+                console.log(
+                    'Block ' + blockchain.blocks.length() +
+                    ' has invalid hash. Ignoring this and subsequent blocks.'
+                );
+            }
+        });
+    } else {
+        bookchain.busy = false;
     }
 }
 
+function setBlock(block) {
+    bookchain.busy = true;
+    console.log('Validating new block...')
 
-
-function makeRequest (method, url, data) {
-    return new Promise(function (resolve, reject) {
-        var xhr = new XMLHttpRequest();
-        xhr.open(method, url);
-        xhr.onload = function () {
-            if (this.status >= 200 && this.status < 300) {
-                if (xhr.response === '') {
-                    resolve('')
-                }
-                else {
-                    resolve(JSON.parse(xhr.response));
-                }
-            }
-            else {
-                reject({
-                    status: this.status,
-                    statusText: xhr.statusText
-                });
-            }
-        };
-        xhr.onerror = function () {
-            reject({
-                status: this.status,
-                statusText: xhr.statusText
-            });
-        };
-
-        if (method === 'POST') {
-            xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
-            xhr.send(JSON.stringify(data))
+    getHash(block).then(digestValue => {
+        const hexDigest = hexString(digestValue);
+        if (blockchain.peekMostRecentBlock()['hash'] === hexDigest) {
+            blockchain.push(block);
+            console.log(
+                'Validated and added block ' + this.blocks.length + ': ' + block
+            );
+            bookchain.newBlockCallback();
+            bookchain.busy = false;
         } else {
-            xhr.send();
+            console.log(
+                'Invalid block ignored: ' + block
+            );
+            bookchain.busy = false;
         }
     });
 }
 
-
-function hexString(buffer) {
-    const byteArray = new Uint8Array(buffer);
-        const hexCodes = [...byteArray].map(value => {
-        const hexCode = value.toString(16);
-        const paddedHexCode = hexCode.padStart(2, '0');
-        return paddedHexCode;
-    });
-
-    return hexCodes.join('');
+function sendNewBlock(bookchain, blockContent) {
+    console.log('Submitting new block to network: ' + blockContent);
 }
+
