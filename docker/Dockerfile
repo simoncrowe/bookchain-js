@@ -18,8 +18,9 @@ RUN pip install --upgrade pip && \
 
 COPY ./docker/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/supervisord.conf /etc/supervisord/supervisord.conf
+COPY ./docker/ssl /etc/ssl
 
-EXPOSE 8000
+EXPOSE 443
 
 WORKDIR /app
 

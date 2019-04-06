@@ -108,3 +108,5 @@ venv.bak/
 
 # Project specific
 *.cfg
+nginx.conf
+docker/ssl
