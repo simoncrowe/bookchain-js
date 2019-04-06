@@ -16,7 +16,7 @@ def index():
         queue_router_port=app.config.get('QUEUE_ROUTER_PORT'),
         validation_service_host=app.config.get('VALIDATION_SERVICE_HOST'),
         validation_service_port=app.config.get('VALIDATION_SERVICE_PORT'),
-        secs_factor= app.config.get('SECS_FACTOR'),
+        about_text= app.config.get('ABOUT_TEXT'),
     )
 
 

@@ -9,6 +9,8 @@
     <script src="/static/js/bookchain.js" type="text/javascript"></script>
     <script type="text/javascript">
 
+        var loaded = false;
+
         var bookchain = null;
         var latestBlockText = null;
 
@@ -60,6 +62,7 @@
             loadingText.textContent = message;
 
             if (loadedAmount === 1.0) {
+                loaded = true;
                 loadingTags.style.display = 'none';
                 loadedTags.style.display = 'block';
             }
@@ -70,7 +73,7 @@
             let latestBlock = bookchain.peekMostRecentBlock();
 
             textBox = document.getElementById('textbox');
-            if ((document.activeElement !== textBox) && (textBox.value === '')) {
+            if (loaded && (document.activeElement !== textBox) && (textBox.value === '')) {
                 latestBlockText = latestBlock.text;
                 updateGreeting();
             }

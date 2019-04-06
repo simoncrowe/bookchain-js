@@ -24,7 +24,7 @@ p {
     height: 23px;
     font-size: 1.1em;
     margin-bottom: 5px;
-    border-bottom: 1px solid #bbb;
+    border-bottom: 1px solid #105070;
 }
 
 #top-nav {
@@ -128,4 +128,10 @@ p {
 
 .block-info-heading {
     color: #555;
+}
+
+#about-container {
+    margin: 0 auto;
+    max-width: 800px;
+    min-width: 300px;
 }
