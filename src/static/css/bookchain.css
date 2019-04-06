@@ -13,6 +13,20 @@ p {
     margin: 0 0 2px 0;
 }
 
+#loading-tags {
+    max-width: 800px;
+    margin: 0 auto 5px auto;
+}
+
+#loading-bar {
+    width: 1%;
+    padding: 2px 5px 8px 10px;
+    height: 23px;
+    font-size: 1.1em;
+    margin-bottom: 5px;
+    border-bottom: 1px solid #bbb;
+}
+
 #top-nav {
     max-width: 800px;
     padding: 2px 5px 8px 10px;
@@ -92,6 +106,8 @@ p {
     margin: 5px 5px 5px 0;
     background-color: #eee;
     border-radius: 3px;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
 }
 
 .hash-paragraph {

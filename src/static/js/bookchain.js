@@ -1,6 +1,6 @@
 
 class Bookchain {
-    constructor(routerIp, routerPort, newBlockCallback) {
+    constructor(routerIp, routerPort, newBlockCallback, loadingInfoCallback) {
 
         this.routerIp = routerIp;
         this.routerPort = routerPort;
@@ -9,8 +9,11 @@ class Bookchain {
         this.epoch = null;
         this.token = null;
         this.blocks = [];
+        this.receivedBlocks = false;
+        this.consumingQueue = false;
         this.busy = false;
         this.newBlockCallback = newBlockCallback;
+        this.loadingInfoCallback = loadingInfoCallback;
     }
 
     peekMostRecentBlock() {
@@ -43,8 +46,8 @@ class Bookchain {
 }
 
 
-function initialiseBookchain(routerIp, routerPort, secsFactor) {
-    let bookchain = new Bookchain(routerIp, routerPort, secsFactor);
+function initialiseBookchain(routerIp, routerPort, newBlockCallback, loadingInfoCallback) {
+    let bookchain = new Bookchain(routerIp, routerPort, newBlockCallback, loadingInfoCallback);
 
     // initialiseTime begins a chain of callbacks that initialise
     // this Bookchain instance with an identity and the latest blocks
@@ -55,8 +58,16 @@ function initialiseBookchain(routerIp, routerPort, secsFactor) {
 
 
 function requestIdentity(bookchain) {
+    bookchain.loadingInfoCallback(
+        0.1,
+        'Node initialised. Requesting identity...'
+    );
     bookchain.routerGetRequest('/register').then(
         function(data) {
+            bookchain.loadingInfoCallback(
+                0.2,
+                'Successfully got identity: ' + data.identity
+            );
             console.log('Successfully got identity: ' + data.identity);
             bookchain.identity = data['identity'];
             bookchain.epoch = data['epoch'];
@@ -76,6 +87,10 @@ function requestIdentity(bookchain) {
 
 function generateAuthToken(bookchain) {
     console.log('Generating auth token...')
+    bookchain.loadingInfoCallback(
+        0.3,
+        'Generating auth token...'
+    );
     bookchain.getAuthToken().then(digestValue => {
         bookchain.token = hexString(digestValue);
         requestPartnerAddress(bookchain)
@@ -84,10 +99,18 @@ function generateAuthToken(bookchain) {
 
 function requestPartnerAddress(bookchain) {
     console.log('Attempting to pair...')
+    bookchain.loadingInfoCallback(
+        0.5,
+        'Attempting to find another node...'
+    );
     const pairUrl = '/pair' + bookchain.getAuthQueryString();
     bookchain.routerGetRequest(pairUrl).then(
         function(data) {
             console.log('Successfully got partner address! ' + data['address']);
+            bookchain.loadingInfoCallback(
+                0.6,
+                'Got node address! ' + data['address']
+            );
             sendBlocksRequest(bookchain, partnerAddress=data['address']);
         }, function (error) {
             console.log(
@@ -117,7 +140,17 @@ function sendBlocksRequest(bookchain, partnerAddress) {
     bookchain.routerPostRequest('/enqueue', data).then(
         function(data) {
             console.log('Successfully sent request for blocks.');
-            initialiseQueueConsumption(bookchain);
+
+            bookchain.loadingInfoCallback(
+                0.7,
+                'Request for blocks sent...'
+            );
+            if (bookchain.consumingQueue === false) {
+                initialiseQueueConsumption(bookchain);
+            }
+            setTimeout(function() {
+                checkReceivedBlocks(bookchain);
+            }, 3000);
         },
         function (error) {
             console.log(
@@ -127,15 +160,26 @@ function sendBlocksRequest(bookchain, partnerAddress) {
             console.log('Retrying in 200 milliseconds...')
             setTimeout(function() {
                 sendBlocksRequest(bookchain, partnerAddress);
-            }
-            , 200);
+            }, 200);
         }
     )
 }
 
 
+function checkReceivedBlocks(bookchain) {
+    if (bookchain.receivedBlocks === false) {
+        bookchain.loadingInfoCallback(
+            0.5,
+            'No response received from partner node. Trying another... '
+        );
+        console.log('No response received from partner. Trying another... ')
+        requestPartnerAddress(bookchain);
+    }
+}
+
 function initialiseQueueConsumption(bookchain) {
     console.log('Starting to consume queue...')
+    bookchain.consumingQueue = true;
     setInterval(function() {
         consumeQueue(bookchain);
     }, 1000);
@@ -214,24 +258,34 @@ function sendPartnerBlocks(bookchain, partnerAddress) {
 function initialiseBlocks(bookchain, blocks) {
     bookchain.busy = true;
     console.log('Checking integrity of bookchain...')
+
+        bookchain.loadingInfoCallback(
+            0.8,
+            'Checking integrity of bookchain...'
+        );
     addBlocks(bookchain, blocks);
 }
 
 function addBlocks(bookchain, blocks) {
     if (blocks.length > 0) {
         const nextBlock = blocks.shift();
-        addBlock(bookchain, nextBlock);
+        addBlock(bookchain, nextBlock, blocks);
 
     } else {
         bookchain.busy = false;
+        bookchain.receivedBlocks = true;
+        bookchain.loadingInfoCallback(
+            1.0,
+            'All blocks processed.'
+        );
     }
 }
 
-function addBlock(bookchain, block) {
+function addBlock(bookchain, block, blocks=null) {
     bookchain.busy = true;
     console.log('Validating new block...')
 
-    const mostRecentBlock = bookchain.peekMostRecentBlock();
+    let mostRecentBlock = bookchain.peekMostRecentBlock();
 
     if (mostRecentBlock === null) {
         // No hash to check as this is the genesis block
@@ -241,13 +295,19 @@ function addBlock(bookchain, block) {
              JSON.stringify(block)
         );
         bookchain.newBlockCallback();
-        bookchain.busy = false;
+
+        // Continue adding blocks in cases where there are many
+        if (blocks !== null) {
+            addBlocks(bookchain, blocks)
+        } else {
+            bookchain.busy = false;
+        }
 
     }
     else {
         // This is a regular block
-        getHash(JSON.stringify(mostRecentBlock)).then(digestValue => {
-            const hexDigest = hexString(digestValue);
+        getHash(getBlockString(mostRecentBlock)).then(digestValue => {
+            let hexDigest = hexString(digestValue);
 
             if (block['hash'] === hexDigest) {
                 bookchain.blocks.push(block);
@@ -256,10 +316,21 @@ function addBlock(bookchain, block) {
                      + bookchain.blocks.length + ': ' + JSON.stringify(block)
                 );
                 bookchain.newBlockCallback();
-                bookchain.busy = false;
+
+                // Continue adding blocks in cases where there are many
+                if (blocks !== null) {
+                    addBlocks(bookchain, blocks)
+                } else {
+                    bookchain.busy = false;
+                }
             } else {
                 console.log(
                     'Invalid block ignored: ' + JSON.stringify(block)
+                );
+                bookchain.loadingInfoCallback(
+                    0.9,
+                    'Hashes do not match! ' +
+                    'Encountered invalid block. Ignoring remaining blocks.'
                 );
                 bookchain.busy = false;
             }
@@ -271,7 +342,7 @@ function sendNewBlock(bookchain, blockContent) {
     bookchain.busy = true;
     console.log('Submitting new block to network: ' + blockContent);
 
-    const mostRecentBlock = bookchain.peekMostRecentBlock();
+    let mostRecentBlock = bookchain.peekMostRecentBlock();
     postData = {
         'identity': bookchain.identity,
         'token': bookchain.token,
@@ -284,7 +355,6 @@ function sendNewBlock(bookchain, blockContent) {
         // Proceed without a hash for the genesis block
         postData['data'] = JSON.stringify(
             {
-                'type': 'ADD_BLOCK',
                 'type': 'ADD_BLOCK',
                 'block': {
                     'text': blockContent,
@@ -312,8 +382,8 @@ function sendNewBlock(bookchain, blockContent) {
     }
     else {
         // Get the hash of the previous block
-        getHash(JSON.stringify(bookchain.peekMostRecentBlock())).then(digestValue => {
-            const hexDigest = hexString(digestValue);
+        getHash(getBlockString(mostRecentBlock)).then(digestValue => {
+            let hexDigest = hexString(digestValue);
             postData['data'] = JSON.stringify(
                 {
                     'type': 'ADD_BLOCK',
@@ -345,3 +415,10 @@ function sendNewBlock(bookchain, blockContent) {
 
 }
 
+function getBlockString(block) {
+    let blockHash = 'null';
+    if (block.hash !== null) {
+        let blockHash = block.hash;
+    }
+    return blockHash + block.text + block.timestamp;
+}

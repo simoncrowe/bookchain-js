@@ -12,6 +12,12 @@
         var bookchain = null;
         var latestBlockText = null;
 
+        var loadingBar = null;
+        var loadingText = null;
+        var loadingTags = null;
+
+        var loadedTags = null;
+
         var writeButton = null;
         var readButton = null;
         var aboutButton = null;
@@ -23,11 +29,10 @@
         var messageParagraph = null;
 
         document.addEventListener("DOMContentLoaded", function(event) {
-            bookchain = initialiseBookchain(
-                queueRouterIp='{{ queue_router_host }}',
-                queueRouterPort={{ queue_router_port }},
-                newBlockCallback = updateLatestBlockText,
-            );
+            loadingBar = document.getElementById('loading-bar');
+            loadingText = document.getElementById('loading-text');
+            loadingTags = document.getElementById('loading-tags');
+            loadedTags = document.getElementById('loaded-tags');
 
             writeButton = document.getElementById('write-button');
             readButton = document.getElementById('read-button');
@@ -39,15 +44,33 @@
 
             messageParagraph = document.getElementById('message');
 
+            bookchain = initialiseBookchain(
+                queueRouterIp='{{ queue_router_host }}',
+                queueRouterPort={{ queue_router_port }},
+                newBlockCallback=updateLatestBlockText,
+                loadingInfoCallback=updateLoadingInfo,
+            );
+
             updateGreeting();
             showWriteContainer();
         });
+
+        function updateLoadingInfo(loadedAmount, message) {
+            loadingBar.style.width = (loadedAmount * 100) + '%';
+            loadingText.textContent = message;
+
+            if (loadedAmount === 1.0) {
+                loadingTags.style.display = 'none';
+                loadedTags.style.display = 'block';
+            }
+        }
+
 
         function updateLatestBlockText() {
             let latestBlock = bookchain.peekMostRecentBlock();
 
             textBox = document.getElementById('textbox');
-            if (document.activeElement !== textBox) {
+            if ((document.activeElement !== textBox) && (textBox.value === '')) {
                 latestBlockText = latestBlock.text;
                 updateGreeting();
             }
@@ -191,30 +214,36 @@
     </script>
 </head>
 <body>
-    <div id="top-nav">
-        <div id="write-button" class="nav-link" onclick="showWriteContainer();">
-            WRITE
-        </div>
-        <div id="read-button" class="nav-link" onclick="showReadContainer();">
-            READ
-        </div>
-        <div id="about-button" class="nav-link" onclick="showAboutContainer();">
-            ABOUT
-        </div>
-        <div class="clear-both"></div>
+    <div id="loading-tags">
+        <div id="loading-bar">Loading...</div>
+        <div id="loading-text"></div>
     </div>
-    <div id="write-container" style="display:none;">
-        <div id="greeting"></div>
-        <textarea id="textbox"></textarea>
-        <div id="submit" onclick="submitBlock();">SUBMIT</div>
-        <div id="messages"><p id="message"></p></div>
-    </div>
+    <div id="loaded-tags" style="display: none;">
+        <div id="top-nav">
+            <div id="write-button" class="nav-link" onclick="showWriteContainer();">
+                WRITE
+            </div>
+            <div id="read-button" class="nav-link" onclick="showReadContainer();">
+                READ
+            </div>
+            <div id="about-button" class="nav-link" onclick="showAboutContainer();">
+                ABOUT
+            </div>
+            <div class="clear-both"></div>
+        </div>
+        <div id="write-container" style="display:none;">
+            <div id="greeting"></div>
+            <textarea id="textbox"></textarea>
+            <div id="submit" onclick="submitBlock();">SUBMIT</div>
+            <div id="messages"><p id="message"></p></div>
+        </div>
 
-    <div id="read-container" class="clear-both" style="display:none;">
-    </div>
+        <div id="read-container" class="clear-both" style="display:none;">
+        </div>
 
-    <div id="about-container" class="clear-both" style="display:none;">
-        {{ about_text| safe }}
+        <div id="about-container" class="clear-both" style="display:none;">
+            {{ about_text| safe }}
+        </div>
     </div>
 </body>
 </html>
