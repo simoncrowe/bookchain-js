@@ -1,10 +1,9 @@
 
 class Bookchain {
-    constructor(routerIp, routerPort, newBlockCallback, loadingInfoCallback) {
+    constructor(routerHost, newBlockCallback, loadingInfoCallback) {
 
-        this.routerIp = routerIp;
-        this.routerPort = routerPort;
-        this.routerUrl = 'http://' + routerIp + ':' + routerPort;
+        this.routerHost = routerHost;
+        this.routerUrl = 'https://' + routerHost ;
         this.identity = null;
         this.epoch = null;
         this.token = null;
@@ -46,8 +45,8 @@ class Bookchain {
 }
 
 
-function initialiseBookchain(routerIp, routerPort, newBlockCallback, loadingInfoCallback) {
-    let bookchain = new Bookchain(routerIp, routerPort, newBlockCallback, loadingInfoCallback);
+function initialiseBookchain(routerHost, newBlockCallback, loadingInfoCallback) {
+    let bookchain = new Bookchain(routerHost, newBlockCallback, loadingInfoCallback);
 
     // initialiseTime begins a chain of callbacks that initialise
     // this Bookchain instance with an identity and the latest blocks

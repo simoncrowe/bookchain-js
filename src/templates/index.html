@@ -47,8 +47,7 @@
             messageParagraph = document.getElementById('message');
 
             bookchain = initialiseBookchain(
-                queueRouterIp='{{ queue_router_host }}',
-                queueRouterPort={{ queue_router_port }},
+                routerHost='{{ queue_router_host }}',
                 newBlockCallback=updateLatestBlockText,
                 loadingInfoCallback=updateLoadingInfo,
             );
@@ -93,7 +92,7 @@
                 };
                 makeRequest(
                     'POST',
-                    'http://{{ validation_service_host }}:{{ validation_service_port }}/validate',
+                    'https://{{ validation_service_host }}/validate',
                      data
                 ).then(
                     function(response) {
@@ -167,7 +166,7 @@
         function updateGreeting() {
             makeRequest(
                 'POST',
-                'http://{{ validation_service_host }}:{{ validation_service_port }}/greeting',
+                'https://{{ validation_service_host }}/greeting',
                  {'latest_block_text': latestBlockText}
             ).then(
                 function(response) {

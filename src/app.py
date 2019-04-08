@@ -13,7 +13,6 @@ def index():
     return render_template(
         'index.html',
         queue_router_host=app.config.get('QUEUE_ROUTER_HOST'),
-        queue_router_port=app.config.get('QUEUE_ROUTER_PORT'),
         validation_service_host=app.config.get('VALIDATION_SERVICE_HOST'),
         validation_service_port=app.config.get('VALIDATION_SERVICE_PORT'),
         about_text= app.config.get('ABOUT_TEXT'),
