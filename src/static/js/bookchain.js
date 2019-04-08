@@ -76,10 +76,10 @@ function requestIdentity(bookchain) {
             console.log(
                 '"/register" request failed. Code: ' + error.status
             );
-            console.log('Retrying in 200 milliseconds...')
+            console.log('Retrying in 500 milliseconds...')
             setTimeout(function() {
                 requestIdentity(bookchain);
-            }, 200)
+            }, 500)
         }
     )
 }
@@ -116,10 +116,10 @@ function requestPartnerAddress(bookchain) {
                 '"/pair" request failed.' +
                 'Could not get partner address. Status: ' + error.status
             );
-            console.log('Retrying in 200 milliseconds...')
+            console.log('Retrying in 250 milliseconds...')
             setTimeout(function(){
                 requestPartnerAddress(bookchain);
-            }, 200);
+            }, 250);
         }
     );
 }
@@ -156,10 +156,10 @@ function sendBlocksRequest(bookchain, partnerAddress) {
                 '"/enqueue" request to send message for blocks failed.' +
                 'Status: ' + error.status
             );
-            console.log('Retrying in 200 milliseconds...')
+            console.log('Retrying in 500 milliseconds...')
             setTimeout(function() {
                 sendBlocksRequest(bookchain, partnerAddress);
-            }, 200);
+            }, 500);
         }
     )
 }
@@ -248,7 +248,7 @@ function sendPartnerBlocks(bookchain, partnerAddress) {
             setTimeout(function(){
                 console.log('Retrying sending blocks...')
                 sendPartnerBlocks(bookchain, partnerAddress);
-            }, 200);
+            }, 500);
         }
     )
 }
@@ -375,7 +375,7 @@ function sendNewBlock(bookchain, blockContent) {
                 console.log('Retrying in 200 milliseconds...')
                 setTimeout(function() {
                     sendNewBlock(bookchain, blockContent);
-                }, 200);
+                }, 500);
             }
         );
     }
@@ -406,7 +406,7 @@ function sendNewBlock(bookchain, blockContent) {
                     console.log('Retrying in 200 milliseconds...')
                     setTimeout(function() {
                         sendNewBlock(bookchain, blockContent);
-                    }, 200);
+                    }, 500);
                 }
             );
         });
