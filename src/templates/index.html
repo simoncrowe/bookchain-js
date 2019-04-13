@@ -63,7 +63,9 @@
             if (loadedAmount === 1.0) {
                 // Get a greeting once the last block is loaded
                 let latestBlock = bookchain.peekMostRecentBlock();
-                latestBlockText = latestBlock.text;
+                if (latestBlock !== null)  {
+                    latestBlockText = latestBlock.text;
+                }
                 updateGreeting();
 
                 loaded = true;
