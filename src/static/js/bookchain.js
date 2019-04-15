@@ -327,7 +327,7 @@ function addBlock(bookchain, block, blocks=null) {
                     'Invalid block ignored: ' + JSON.stringify(block)
                 );
                 bookchain.loadingInfoCallback(
-                    0.9,
+                    1,
                     'Hashes do not match! ' +
                     'Encountered invalid block. Ignoring remaining blocks.'
                 );
