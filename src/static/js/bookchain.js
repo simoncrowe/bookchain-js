@@ -321,6 +321,8 @@ function addBlock(bookchain, block, blocks=null) {
                     addBlocks(bookchain, blocks)
                 } else {
                     bookchain.busy = false;
+                    // Will allow node to continue with unsullied blocks
+                    bookchain.receivedBlocks = true;
                 }
             } else {
                 console.log(
