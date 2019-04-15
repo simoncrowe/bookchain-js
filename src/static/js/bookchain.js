@@ -417,7 +417,7 @@ function sendNewBlock(bookchain, blockContent) {
 function getBlockString(block) {
     let blockHash = 'null';
     if (block.hash !== null) {
-        let blockHash = block.hash;
+        blockHash = block.hash;
     }
     return blockHash + block.text + block.timestamp;
 }
