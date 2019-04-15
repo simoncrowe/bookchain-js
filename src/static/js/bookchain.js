@@ -166,7 +166,12 @@ function sendBlocksRequest(bookchain, partnerAddress) {
 
 
 function checkReceivedBlocks(bookchain) {
-    if (bookchain.receivedBlocks === false) {
+    if (bookchain.receivedBlocks) {
+        bookchain.loadingInfoCallback(
+            1,
+            'Node ready.'
+        );
+    } else {
         bookchain.loadingInfoCallback(
             0.5,
             'No response received from partner node. Trying another... '
@@ -274,7 +279,7 @@ function addBlocks(bookchain, blocks) {
         bookchain.busy = false;
         bookchain.receivedBlocks = true;
         bookchain.loadingInfoCallback(
-            1.0,
+            0.95,
             'All blocks processed.'
         );
     }
@@ -327,7 +332,7 @@ function addBlock(bookchain, block, blocks=null) {
                     'Invalid block ignored: ' + JSON.stringify(block)
                 );
                 bookchain.loadingInfoCallback(
-                    1,
+                    0.9,
                     'Hashes do not match! ' +
                     'Encountered invalid block. Ignoring remaining blocks.'
                 );
